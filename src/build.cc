@@ -155,7 +155,7 @@ void BuildStatus::BuildEdgeFinished(Edge* edge,
     // only a few hundred available on some systems, and ninja can launch
     // thousands of parallel compile commands.)
     string final_output;
-    if (!printer_.supports_color())
+    if (!printer_.supports_color() && !config_.force_color_output)
       final_output = StripAnsiEscapeCodes(output);
     else
       final_output = output;

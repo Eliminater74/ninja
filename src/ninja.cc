@@ -221,6 +221,8 @@ void Usage(const BuildConfig& config) {
 "    terminates toplevel options; further flags are passed to the tool\n"
 "  -w FLAG  adjust warnings (use '-w list' to list warnings)\n",
           kNinjaVersion, config.parallelism);
+"  -c       force using color output\n"
+      , kNinjaVersion, config.parallelism);
 }
 
 /// Choose a default value for the -j (parallelism) flag.
@@ -1133,7 +1135,7 @@ int ReadFlags(int* argc, char*** argv,
 
   int opt;
   while (!options->tool &&
-         (opt = getopt_long(*argc, *argv, "d:f:j:k:l:nt:vw:C:h", kLongOptions,
+         (opt = getopt_long(*argc, *argv, "d:f:j:k:l:nct:vw:C:h", kLongOptions,
                             NULL)) != -1) {
     switch (opt) {
       case 'd':
@@ -1195,6 +1197,9 @@ int ReadFlags(int* argc, char*** argv,
       case OPT_VERSION:
         printf("%s\n", kNinjaVersion);
         return 0;
+      case 'c':
+        config->force_color_output = false;
+        break;
       case 'h':
       default:
         Usage(*config);
