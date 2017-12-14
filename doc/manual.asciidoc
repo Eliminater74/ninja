@@ -190,7 +190,8 @@ you don't need to pass `-j`.)
 Environment variables
 ~~~~~~~~~~~~~~~~~~~~~
 
-Ninja supports one environment variable to control its behavior:
+Ninja supports two environment variables to control its behavior:
+
 `NINJA_STATUS`, the progress status printed before the rule being run.
 
 Several placeholders are available:
@@ -210,6 +211,17 @@ specified by `-j` or its default)
 The default progress status is `"[%f/%t] "` (note the trailing space
 to separate from the build rule). Another example of possible progress status
 could be `"[%u/%r/%f] "`.
+
+`NINJA_PARALLEL_JOBS`, the maximum number of jobs to run in parallel.
+
+This is the same as the -j option and can be used to override the default
+value guessed by Ninja. For instance, you might want to use only the number
+of physical cores even when virtual cores are available, especially when
+working with slow storage mediums. Or in a shared environment, using all
+cores could disturb other users. Instead of providing the -j option every
+time on the command line, set this environment variable for the system,
+the user or the current shell, as appropriate.
+
 
 Extra tools
 ~~~~~~~~~~~
@@ -627,7 +639,7 @@ or a build statement.
 
 No matter what pools you specify, ninja will never run more concurrent jobs
 than the default parallelism, or the number of jobs specified on the command
-line (with `-j`).
+line (with `-j`) or with the environment variable NINJA_PARALLEL_JOBS.
 
 ----------------
 # No more than 4 links at a time.
