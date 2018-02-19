@@ -30,6 +30,10 @@
 #include <unistd.h>
 #endif
 
+#ifndef _WIN32
+#include <sys/wait.h>
+#endif
+
 #include "browse.h"
 #include "build.h"
 #include "build_log.h"
@@ -77,6 +81,9 @@ struct Options {
   /// Whether a depfile with multiple targets on separate lines should
   /// warn or print an error.
   bool depfile_distinct_target_lines_should_err;
+
+  /// Whether and when to spawn a zygote.
+  int zygote;
 };
 
 /// The Ninja main() loads up a series of data structures; various tools need
@@ -1130,7 +1137,7 @@ int ReadFlags(int* argc, char*** argv,
 
   int opt;
   while (!options->tool &&
-         (opt = getopt_long(*argc, *argv, "d:f:j:k:l:nt:vw:C:h", kLongOptions,
+         (opt = getopt_long(*argc, *argv, "d:f:j:k:l:nt:vw:C:zh", kLongOptions,
                             NULL)) != -1) {
     switch (opt) {
       case 'd':
@@ -1189,6 +1196,13 @@ int ReadFlags(int* argc, char*** argv,
       case 'C':
         options->working_dir = optarg;
         break;
+      case 'z':
+#ifdef _WIN32
+        Fatal("-z not supported on Windows.");
+#else
+        ++options->zygote;
+#endif
+        break;
       case OPT_VERSION:
         printf("%s\n", kNinjaVersion);
         return 0;
@@ -1202,6 +1216,40 @@ int ReadFlags(int* argc, char*** argv,
   *argc -= optind;
 
   return -1;
+}
+
+void SpawnZygote(const char* when) {
+#ifdef _WIN32
+  Fatal("can't spawn zygote %s, not supported on Windows.", when);
+#else
+  printf("zygote started %s, waiting for input.\n", when);
+  char* buf = nullptr;
+  size_t len = 0;
+  while (true) {
+    ssize_t rc = getline(&buf, &len, stdin);
+    if (rc < 0) {
+      // TODO: Should this be the last result we received?
+      exit(0);
+    }
+
+    pid_t pid = fork();
+    if (pid == -1) {
+      Fatal("fork failed: %s", strerror(errno));
+    } else if (pid == 0) {
+      // Child, continue normally.
+      printf("zygote worker spawned.\n");
+      return;
+    } else {
+      int status;
+      pid_t rc = TEMP_FAILURE_RETRY(waitpid(pid, &status, 0));
+      if (rc == -1) {
+        Fatal("failed to wait for child: %s", strerror(errno));
+      }
+
+      // TODO: Do something with status?
+    }
+  }
+#endif
 }
 
 NORETURN void real_main(int argc, char** argv) {
@@ -1263,6 +1311,10 @@ NORETURN void real_main(int argc, char** argv) {
       exit(1);
     }
 
+    if (options.zygote == 1) {
+      SpawnZygote("after parsing ninjafile");
+    }
+
     if (options.tool && options.tool->when == Tool::RUN_AFTER_LOAD)
       exit((ninja.*options.tool->func)(&options, argc, argv));
 
@@ -1271,6 +1323,10 @@ NORETURN void real_main(int argc, char** argv) {
 
     if (!ninja.OpenBuildLog() || !ninja.OpenDepsLog())
       exit(1);
+
+    if (options.zygote == 2) {
+      SpawnZygote("after reading build and deps logs");
+    }
 
     if (options.tool && options.tool->when == Tool::RUN_AFTER_LOGS)
       exit((ninja.*options.tool->func)(&options, argc, argv));
@@ -1289,6 +1345,10 @@ NORETURN void real_main(int argc, char** argv) {
     }
 
     int result = ninja.RunBuild(argc, argv);
+
+    if (options.zygote == 3) {
+      SpawnZygote("after rebuilding manifest");
+    }
     if (g_metrics)
       ninja.DumpMetrics();
     exit(result);
