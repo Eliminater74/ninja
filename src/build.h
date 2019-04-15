@@ -139,7 +139,6 @@ struct CommandRunner {
 struct BuildConfig {
   BuildConfig() : verbosity(NORMAL), dry_run(false), parallelism(1),
                   failures_allowed(1), max_load_average(-0.0f),
-                  missing_depfile_should_err(false),
                   force_color_output(true) {}
 
   enum Verbosity {
